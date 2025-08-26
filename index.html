@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Meeting Tools</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    :root {
+      --primary: #007bff;
+      --primary-hover: #0056b3;
+      --bg: #f9f9f9;
+      --text: #333;
+      --border: #ddd;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 24px;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 32px;
+      font-size: 2rem;
+    }
+
+    .tab-buttons {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .tab-button {
+      padding: 10px 20px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #eee;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 1rem;
+    }
+
+    .tab-button:hover {
+      background: #ddd;
+    }
+
+    .tab-button.active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .tab-content {
+      display: none;
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 20px;
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+
+    form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    input[type="file"], 
+    input[type="text"] {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 1rem;
+    }
+
+    button {
+      padding: 10px 20px;
+      background: var(--primary);
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      font-size: 1rem;
+    }
+
+    button:hover {
+      background: var(--primary-hover);
+    }
+
+    #summarizeResult, #chatAnswer {
+      background: #f4f4f4;
+      border: 1px solid var(--border);
+      padding: 16px;
+      white-space: pre-wrap;
+      margin-top: 20px;
+      border-radius: 6px;
+      font-size: 0.95rem;
+    }
+
+    #summarizeLoading, #chatLoading {
+      color: var(--primary);
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <h1>Meeting Tools</h1>
+
+  <div class="tab-buttons">
+    <button class="tab-button active" onclick="showTab('summarizeTab')">Summarize MP3</button>
+    <button class="tab-button" onclick="showTab('chatTab')">Chat with MP3</button>
+  </div>
+
+  <div id="summarizeTab" class="tab-content active">
+    <h2>Summarize a Meeting</h2>
+    <form id="summarizeForm">
+      <input type="file" id="summarizeFileInput" accept=".mp3" required>
+      <button type="submit">Summarize</button>
+    </form>
+    <div id="summarizeLoading"></div>
+    <div id="summarizeResult"></div>
+  </div>
+
+  <div id="chatTab" class="tab-content">
+    <h2>Chat with your Meeting</h2>
+    <form id="chatWithMp3Form">
+      <input type="file" id="chatMp3Input" accept=".mp3" required>
+      <input type="text" id="chatMp3Question" placeholder="Type your question..." required>
+      <button type="submit">Get Answer</button>
+    </form>
+    <div id="chatLoading"></div>
+    <div id="chatAnswer"></div>
+  </div>
+
+  <script>
+    function showTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+      document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    document.getElementById('summarizeForm').onsubmit = async function(e) {
+      e.preventDefault();
+      const fileInput = document.getElementById('summarizeFileInput');
+      const loading = document.getElementById('summarizeLoading');
+      const result = document.getElementById('summarizeResult');
+      if (!fileInput.files.length) return;
+
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+
+      loading.textContent = 'Summarizing... (may take a few minutes)';
+      result.textContent = '';
+
+      try {
+        const response = await fetch('/summarize_mp3', { method: 'POST', body: formData });
+        const data = await response.json();
+        result.textContent = response.ok && data.summary ? data.summary : (data.error || 'Summarize failed');
+      } catch (err) {
+        result.textContent = 'Request failed: ' + err;
+      } finally {
+        loading.textContent = '';
+      }
+    };
+
+    document.getElementById('chatWithMp3Form').onsubmit = async function(e) {
+      e.preventDefault();
+      const fileInput = document.getElementById('chatMp3Input');
+      const questionInput = document.getElementById('chatMp3Question');
+      const loading = document.getElementById('chatLoading');
+      const answerDiv = document.getElementById('chatAnswer');
+      if (!fileInput.files.length || !questionInput.value.trim()) return;
+
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+      formData.append('question', questionInput.value.trim());
+
+      loading.textContent = 'Transcribing and asking... (may take a few minutes)';
+      answerDiv.textContent = '';
+
+      try {
+        const res = await fetch('/chat_with_mp3', { method: 'POST', body: formData });
+        const data = await res.json();
+        answerDiv.textContent = data.answer || data.error || 'No answer found.';
+      } catch (err) {
+        answerDiv.textContent = 'Error: ' + err;
+      } finally {
+        loading.textContent = '';
+      }
+    };
+  </script>
+</body>
+</html>
